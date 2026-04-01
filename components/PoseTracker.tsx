@@ -298,7 +298,10 @@ export default function PoseTracker({
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+          // play() explícito obrigatório no iOS Safari após atribuir srcObject
+          await videoRef.current.play().catch((playErr) => {
+            console.error("[PoseTracker] video.play() falhou:", playErr);
+          });
         }
 
         pose = new window.Pose({
@@ -330,10 +333,13 @@ export default function PoseTracker({
         setCarregando(false);
         inicializarVoz();
       } catch (err) {
+        console.error("[PoseTracker] getUserMedia falhou:", err);
+        const errName = err instanceof Error ? err.name : "UnknownError";
+        const errMsg = err instanceof Error ? err.message : String(err);
         const msg =
-          err instanceof Error && err.name === "NotAllowedError"
-            ? "Permissão de câmera negada. Permita o acesso nas configurações do navegador."
-            : "Não foi possível acessar a câmera. Verifique se outro app está usando.";
+          errName === "NotAllowedError"
+            ? `Permissão de câmera negada. Permita o acesso nas configurações do navegador. (${errName})`
+            : `Não foi possível acessar a câmera. (${errName}: ${errMsg})`;
         setErroCamera(msg);
         setCarregando(false);
       }
@@ -367,11 +373,12 @@ export default function PoseTracker({
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
-      {/* Vídeo da câmera */}
+      {/* Vídeo da câmera — playsInline e autoPlay obrigatórios no iOS Safari */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
         playsInline
+        autoPlay
         muted
         style={{ transform: "scaleX(-1)" }}
       />
