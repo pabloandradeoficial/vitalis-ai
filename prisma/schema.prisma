@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Fisioterapeuta {
+  id         String     @id @default(cuid())
+  clerkId    String     @unique
+  nome       String
+  email      String     @unique
+  crm        String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  pacientes  Paciente[]
+
+  @@map("fisioterapeutas")
+}
+
+model Paciente {
+  id                String         @id @default(cuid())
+  nome              String
+  telefone          String?
+  email             String?
+  observacoes       String?
+  fisioterapeutaId  String
+  fisioterapeuta    Fisioterapeuta @relation(fields: [fisioterapeutaId], references: [id], onDelete: Cascade)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  sessoes           Sessao[]
+
+  @@map("pacientes")
+}
+
+model Sessao {
+  id               String       @id @default(cuid())
+  token            String       @unique @default(cuid())
+  pacienteId       String
+  paciente         Paciente     @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  exercicio        String
+  descricao        String?
+  repeticoesAlvo   Int          @default(10)
+  status           StatusSessao @default(PENDENTE)
+  scoreGeral       Float?
+  iniciadaEm       DateTime?
+  finalizadaEm     DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  repeticoes       Repeticao[]
+  relatorio        Relatorio?
+
+  @@map("sessoes")
+}
+
+model Repeticao {
+  id                 String   @id @default(cuid())
+  sessaoId           String
+  sessao             Sessao   @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  numero             Int
+  timestamp          DateTime @default(now())
+  scoreExecucao      Float
+  desviosDetectados  Json     @default("[]")
+  duracaoMs          Int
+  anguloJoelhoMin    Float?
+  anguloJoelhoMax    Float?
+  anguloTronco       Float?
+  simetria           Float?
+
+  @@map("repeticoes")
+}
+
+model Relatorio {
+  id                    String   @id @default(cuid())
+  sessaoId              String   @unique
+  sessao                Sessao   @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
+  scoreMediano          Float
+  scoreMinimo           Float
+  scoreMaximo           Float
+  totalRepeticoes       Int
+  tempoTotalMs          Int
+  desviosMaisFrequentes Json     @default("[]")
+  adesao                Float
+  observacoesIA         String?
+  createdAt             DateTime @default(now())
+
+  @@map("relatorios")
+}
+
+enum StatusSessao {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDA
+  EXPIRADA
+}
