@@ -41,6 +41,12 @@ interface NovoLinkForm {
   repeticoesAlvo: number;
 }
 
+interface NovoPacienteForm {
+  nome: string;
+  telefone: string;
+  email: string;
+}
+
 const EXERCICIOS_COMUNS = [
   "Agachamento",
   "Extensão de joelho",
@@ -56,10 +62,22 @@ export default function DashboardPage() {
   const { user } = useUser();
   const [pacientes, setPacientes] = useState<PacienteComMetricas[]>([]);
   const [carregando, setCarregando] = useState(true);
-  const [mostrarModal, setMostrarModal] = useState(false);
+
+  // Modal: novo exercício (link)
+  const [mostrarModalLink, setMostrarModalLink] = useState(false);
   const [linkGerado, setLinkGerado] = useState<string | null>(null);
   const [gerandoLink, setGerandoLink] = useState(false);
   const [linkCopiado, setLinkCopiado] = useState(false);
+
+  // Modal: novo paciente
+  const [mostrarModalPaciente, setMostrarModalPaciente] = useState(false);
+  const [salvandoPaciente, setSalvandoPaciente] = useState(false);
+  const [erroPaciente, setErroPaciente] = useState<string | null>(null);
+  const [novoPaciente, setNovoPaciente] = useState<NovoPacienteForm>({
+    nome: "",
+    telefone: "",
+    email: "",
+  });
 
   const [form, setForm] = useState<NovoLinkForm>({
     pacienteId: "",
@@ -84,6 +102,34 @@ export default function DashboardPage() {
   useEffect(() => {
     carregarPacientes();
   }, [carregarPacientes]);
+
+  const salvarPaciente = async () => {
+    if (!novoPaciente.nome.trim()) {
+      setErroPaciente("Nome é obrigatório.");
+      return;
+    }
+    setSalvandoPaciente(true);
+    setErroPaciente(null);
+
+    try {
+      const res = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(novoPaciente),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao criar paciente");
+      }
+      await carregarPacientes();
+      setMostrarModalPaciente(false);
+      setNovoPaciente({ nome: "", telefone: "", email: "" });
+    } catch (e) {
+      setErroPaciente(e instanceof Error ? e.message : "Erro inesperado");
+    } finally {
+      setSalvandoPaciente(false);
+    }
+  };
 
   const gerarLink = async () => {
     if (!form.pacienteId || !form.exercicio) return;
@@ -138,12 +184,20 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold">Vitalis AI</h1>
           <p className="text-xs text-gray-400">Olá, {user?.firstName}!</p>
         </div>
-        <button
-          onClick={() => { setMostrarModal(true); setLinkGerado(null); }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl text-sm font-medium transition"
-        >
-          <span>+</span> Novo exercício
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setMostrarModalPaciente(true); setErroPaciente(null); }}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/15 rounded-xl text-sm font-medium transition"
+          >
+            + Paciente
+          </button>
+          <button
+            onClick={() => { setMostrarModalLink(true); setLinkGerado(null); }}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-xl text-sm font-medium transition"
+          >
+            + Exercício
+          </button>
+        </div>
       </header>
 
       {/* Stats rápidas */}
@@ -177,7 +231,12 @@ export default function DashboardPage() {
           <div className="text-center py-16 text-gray-500">
             <p className="text-4xl mb-4">🏥</p>
             <p>Nenhum paciente ainda.</p>
-            <p className="text-sm mt-2">Crie um exercício para começar.</p>
+            <button
+              onClick={() => { setMostrarModalPaciente(true); setErroPaciente(null); }}
+              className="mt-4 text-sm text-blue-400 hover:text-blue-300 underline"
+            >
+              Adicionar primeiro paciente
+            </button>
           </div>
         )}
 
@@ -186,7 +245,6 @@ export default function DashboardPage() {
           const scoreRecente = ultimaSessao?.relatorio?.scoreMediano ?? null;
           const adesao = ultimaSessao?.relatorio?.adesao ?? null;
 
-          // Detectar queda de score nas últimas 2 sessões concluídas
           const sessoesConc = paciente.sessoes.filter(
             (s) => s.status === "CONCLUIDA" && s.relatorio
           );
@@ -215,7 +273,6 @@ export default function DashboardPage() {
                     {paciente.telefone || paciente.email || "Sem contato"}
                   </p>
                 </div>
-
                 <div className="text-right">
                   <p className={`text-2xl font-bold ${getScoreColor(scoreRecente)}`}>
                     {scoreRecente !== null ? Math.round(scoreRecente) : "--"}
@@ -229,7 +286,6 @@ export default function DashboardPage() {
                 <span>🏋️ {paciente.sessoes.filter((s) => s.status === "CONCLUIDA").length} sessões</span>
               </div>
 
-              {/* Links pendentes */}
               {paciente.sessoes.filter((s) => s.status === "PENDENTE").length > 0 && (
                 <div className="mt-3 space-y-2">
                   {paciente.sessoes
@@ -247,9 +303,7 @@ export default function DashboardPage() {
                             <p className="text-xs text-gray-500">Aguardando</p>
                           </div>
                           <button
-                            onClick={() =>
-                              copiarParaWhatsApp(link, paciente.nome, s.exercicio)
-                            }
+                            onClick={() => copiarParaWhatsApp(link, paciente.nome, s.exercicio)}
                             className="text-xs bg-green-600/20 hover:bg-green-600/30 text-green-400 px-3 py-1.5 rounded-lg transition"
                           >
                             {linkCopiado ? "Copiado! ✓" : "📲 WhatsApp"}
@@ -264,14 +318,90 @@ export default function DashboardPage() {
         })}
       </main>
 
-      {/* Modal — gerar link */}
-      {mostrarModal && (
+      {/* Modal — adicionar paciente */}
+      {mostrarModalPaciente && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-3xl w-full max-w-lg p-6 border border-white/10">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold">Adicionar paciente</h2>
+              <button
+                onClick={() => setMostrarModalPaciente(false)}
+                className="text-gray-400 hover:text-white text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 block mb-1.5">
+                  Nome <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={novoPaciente.nome}
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, nome: e.target.value })}
+                  onKeyDown={(e) => e.key === "Enter" && salvarPaciente()}
+                  placeholder="Nome completo"
+                  autoFocus
+                  className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1.5">Telefone (opcional)</label>
+                <input
+                  type="tel"
+                  value={novoPaciente.telefone}
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, telefone: e.target.value })}
+                  placeholder="(11) 99999-9999"
+                  className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 block mb-1.5">E-mail (opcional)</label>
+                <input
+                  type="email"
+                  value={novoPaciente.email}
+                  onChange={(e) => setNovoPaciente({ ...novoPaciente, email: e.target.value })}
+                  placeholder="paciente@email.com"
+                  className="w-full bg-white/5 border border-white/20 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {erroPaciente && (
+                <p className="text-red-400 text-xs">{erroPaciente}</p>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setMostrarModalPaciente(false)}
+                  className="flex-1 py-3 border border-white/20 hover:bg-white/5 rounded-xl text-sm transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={salvarPaciente}
+                  disabled={salvandoPaciente || !novoPaciente.nome.trim()}
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-sm font-semibold transition"
+                >
+                  {salvandoPaciente ? "Salvando..." : "Salvar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — gerar link de exercício */}
+      {mostrarModalLink && (
         <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 p-4">
           <div className="bg-gray-900 rounded-3xl w-full max-w-lg p-6 border border-white/10">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold">Novo exercício</h2>
               <button
-                onClick={() => { setMostrarModal(false); setLinkGerado(null); }}
+                onClick={() => { setMostrarModalLink(false); setLinkGerado(null); }}
                 className="text-gray-400 hover:text-white text-2xl leading-none"
               >
                 ×
