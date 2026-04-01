@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
+import { getOrCreateFisio } from "@/lib/get-or-create-fisio";
 
 // GET /api/sessions?token=xxx — busca sessão pelo token (pública — paciente)
 // GET /api/sessions — lista sessões do fisio autenticado
@@ -41,12 +42,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const fisio = await prisma.fisioterapeuta.findUnique({
-    where: { clerkId: userId },
-  });
-  if (!fisio) {
-    return NextResponse.json({ error: "Fisioterapeuta não encontrado" }, { status: 404 });
-  }
+  const fisio = await getOrCreateFisio(userId);
 
   const pacientes = await prisma.paciente.findMany({
     where: { fisioterapeutaId: fisio.id },
@@ -70,12 +66,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const fisio = await prisma.fisioterapeuta.findUnique({
-    where: { clerkId: userId },
-  });
-  if (!fisio) {
-    return NextResponse.json({ error: "Fisioterapeuta não encontrado" }, { status: 404 });
-  }
+  const fisio = await getOrCreateFisio(userId);
 
   const body = await req.json();
   const { pacienteId, exercicio, descricao, repeticoesAlvo } = body;

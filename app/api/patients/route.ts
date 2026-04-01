@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@clerk/nextjs/server";
+import { getOrCreateFisio } from "@/lib/get-or-create-fisio";
 
 // POST /api/patients — cria paciente vinculado ao fisio autenticado
 export async function POST(req: NextRequest) {
@@ -9,15 +10,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
 
-  const fisio = await prisma.fisioterapeuta.findUnique({
-    where: { clerkId: userId },
-  });
-  if (!fisio) {
-    return NextResponse.json({ error: "Fisioterapeuta não encontrado" }, { status: 404 });
-  }
+  const fisio = await getOrCreateFisio(userId);
 
   const body = await req.json();
-  const { nome, telefone, email } = body;
+  const { nome, telefone, email }: { nome: string; telefone?: string; email?: string } = body;
 
   if (!nome || typeof nome !== "string" || nome.trim().length === 0) {
     return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
