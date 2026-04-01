@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Habilita Turbopack explicitamente (padrão no Next.js 16)
-  turbopack: {},
+  turbopack: {
+    root: __dirname,
+  },
 
   // Headers de segurança + permissão de câmera na rota do paciente
   async headers() {
