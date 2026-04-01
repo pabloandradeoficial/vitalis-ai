@@ -1,5 +1,9 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
+
+// Carrega .env.local primeiro (Vercel), fallback para .env
+config({ path: ".env.local" });
+config({ path: ".env" });
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,8 +11,10 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"] as string,
-    // directUrl para conexão direta (Vercel Postgres / Neon connection pooling)
-    ...(process.env["DIRECT_URL"] ? { directUrl: process.env["DIRECT_URL"] } : {}),
+    // Neon: usa URL não-pooled para migrações (evita timeout no pooler)
+    url:
+      process.env["DIRECT_URL"] ||
+      process.env["DATABASE_URL_UNPOOLED"] ||
+      (process.env["DATABASE_URL"] as string),
   },
 });
