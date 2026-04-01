@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
   // Métricas agregadas das últimas 7 sessões concluídas
   const concluidasRecentes = sessoes
-    .filter((s) => s.status === "CONCLUIDA" && s.relatorio !== null)
+    .filter((s: (typeof sessoes)[number]) => s.status === "CONCLUIDA" && s.relatorio !== null)
     .slice(0, 7) as Array<(typeof sessoes)[number] & { relatorio: NonNullable<(typeof sessoes)[number]["relatorio"]> }>;
 
   const scoresMedios = concluidasRecentes.map((s) => s.relatorio.scoreMediano);
